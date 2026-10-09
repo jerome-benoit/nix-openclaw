@@ -8,6 +8,7 @@
   wrapGAppsHook3,
   gtk3,
   webkitgtk_4_1,
+  glib-networking,
   libayatana-appindicator,
   xdotool,
   gst_all_1,
@@ -46,6 +47,7 @@ stdenvNoCC.mkDerivation {
   buildInputs = lib.optionals (!isDarwin) [
     gtk3
     webkitgtk_4_1
+    glib-networking
     libayatana-appindicator
     xdotool
     gst_all_1.gstreamer

@@ -9,6 +9,7 @@ Older repository history is available in git.
 - Desktop modularity (2026-10-09): expose `homeManagerModules.openclaw-desktop` and `programs.openclaw.desktop.enable/package` for native desktop-only installation, without gateway configuration, services, plugins or Nix-mode preferences.
 - Compatibility: replace `programs.openclaw.installApp`/`appPackage` with `desktop.enable`/`desktop.package`; the managed gateway default bundle no longer contains the app. Desktop remains opt-in on Linux and enabled by default on macOS. Home Manager now owns the default macOS application link; explicit per-instance app paths remain supported.
 - Package the official Linux x86_64 desktop DEB alongside the unchanged macOS 2026.9.5 ZIP pin; preserve the signed Darwin bundle without fixups. Desktop artifact pins and updates are now independent per platform in `nix/sources/openclaw-app.json`.
+- Include the Linux desktop GIO TLS backend so HTTPS connections do not depend on host-provided GIO modules.
 
 - Refresh Nixpkgs, Home Manager, bundled OpenClaw tools and example-plugin inputs, and update the private pnpm 11 runtime to 11.27.0.
 - Refresh Nix inputs and the example plugin lock, and update private source-build pnpm runtimes to 11.27.1 and 12.6.0.
