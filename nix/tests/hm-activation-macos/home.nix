@@ -24,7 +24,7 @@ in
 
   programs.openclaw = {
     enable = true;
-    installApp = false;
+    desktop.enable = false;
     skills = [
       {
         name = "activation-skill";

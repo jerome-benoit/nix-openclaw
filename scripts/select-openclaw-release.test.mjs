@@ -56,14 +56,13 @@ const selection = selectOpenClawRelease(releases);
 assert.equal(selection.latestStable.tagName, "v2026.5.3-1");
 assert.equal(selection.latestStableSource.tagName, "v2026.5.3-1");
 assert.equal(selection.latestStableSource.releaseVersion, "2026.5.3-1");
-assert.equal(selection.latestMacAppStable.tagName, "v2026.5.2");
-assert.equal(selection.latestMacAppStable.releaseVersion, "2026.5.2");
+assert.equal(selection.latestAppStable["aarch64-darwin"].version, "2026.5.2");
 assert.equal(
-  selection.latestMacAppStable.appUrl,
+  selection.latestAppStable["aarch64-darwin"].url,
   "https://github.com/openclaw/openclaw/releases/download/v2026.5.2/OpenClaw-2026.5.2.zip",
 );
 assert.deepEqual(
-  selection.appLagStableReleases.map((release) => release.tagName),
+  selection.appLagStableReleases["aarch64-darwin"].map((release) => release.tagName),
   ["v2026.5.3-1", "v2026.5.3"],
 );
 
@@ -79,9 +78,9 @@ const none = selectOpenClawRelease([
 assert.equal(none.latestStable.tagName, "v2026.5.3");
 assert.equal(none.latestStableSource.tagName, "v2026.5.3");
 assert.equal(none.latestStableSource.releaseVersion, "2026.5.3");
-assert.equal(none.latestMacAppStable, null);
-assert.deepEqual(none.appLagStableReleases, [
-  { tagName: "v2026.5.3", reason: "missing-macos-zip" },
+assert.equal(none.latestAppStable["aarch64-darwin"], null);
+assert.deepEqual(none.appLagStableReleases["aarch64-darwin"], [
+  { tagName: "v2026.5.3", reason: "missing-aarch64-darwin-artifact" },
 ]);
 
 const appVersion = "2026.5.3-1";
@@ -108,24 +107,24 @@ function permutations(items) {
 
 for (const assets of permutations(appAssets)) {
   const result = selectOpenClawRelease([{ ...releases[0], assets }]);
-  assert.equal(result.latestMacAppStable.appAssetName, universalAppName);
-  assert.equal(result.latestMacAppStable.appUrl, appAssets[0].browser_download_url);
-  assert.equal(result.latestMacAppStable.releaseVersion, appVersion);
-  assert.deepEqual(result.appLagStableReleases, []);
+  assert.ok(result.latestAppStable["aarch64-darwin"].url.endsWith(universalAppName));
+  assert.equal(result.latestAppStable["aarch64-darwin"].url, appAssets[0].browser_download_url);
+  assert.equal(result.latestAppStable["aarch64-darwin"].version, appVersion);
+  assert.deepEqual(result.appLagStableReleases["aarch64-darwin"], []);
 }
 
 const thinOnlyRelease = { ...releases[0], assets: appAssets.slice(1) };
 const appLag = selectOpenClawRelease([thinOnlyRelease, releases[3]]);
 assert.equal(appLag.latestStableSource.releaseVersion, appVersion);
-assert.deepEqual(appLag.latestMacAppStable, selection.latestMacAppStable);
-assert.deepEqual(appLag.appLagStableReleases, [
-  { tagName: `v${appVersion}`, reason: "missing-macos-zip" },
+assert.deepEqual(appLag.latestAppStable["aarch64-darwin"], selection.latestAppStable["aarch64-darwin"]);
+assert.deepEqual(appLag.appLagStableReleases["aarch64-darwin"], [
+  { tagName: `v${appVersion}`, reason: "missing-aarch64-darwin-artifact" },
 ]);
 
 const thinOnly = selectOpenClawRelease([thinOnlyRelease]);
 assert.equal(thinOnly.latestStableSource.releaseVersion, appVersion);
-assert.equal(thinOnly.latestMacAppStable, null);
-assert.deepEqual(thinOnly.appLagStableReleases, appLag.appLagStableReleases);
+assert.equal(thinOnly.latestAppStable["aarch64-darwin"], null);
+assert.deepEqual(thinOnly.appLagStableReleases["aarch64-darwin"], appLag.appLagStableReleases["aarch64-darwin"]);
 
 console.log("release selection: ok");
 
@@ -145,8 +144,8 @@ function release(version, hasApp = true) {
 const backportFirst = [release("2026.7.35"), release("2026.9.5"), release("2026.9.4")];
 const backportSelection = selectOpenClawRelease(backportFirst);
 assert.equal(backportSelection.latestStableSource.releaseVersion, "2026.9.5");
-assert.equal(backportSelection.latestMacAppStable.releaseVersion, "2026.9.5");
-assert.deepEqual(backportSelection.appLagStableReleases, []);
+assert.equal(backportSelection.latestAppStable["aarch64-darwin"].version, "2026.9.5");
+assert.deepEqual(backportSelection.appLagStableReleases["aarch64-darwin"], []);
 assert.equal(backportFirst[0].tag_name, "v2026.7.35", "selection must not reorder caller input");
 
 for (const rows of permutations([
@@ -157,8 +156,8 @@ for (const rows of permutations([
 ])) {
   const result = selectOpenClawRelease(rows);
   assert.equal(result.latestStableSource.releaseVersion, "2026.9.5-10");
-  assert.equal(result.latestMacAppStable.releaseVersion, "2026.9.5");
-  assert.deepEqual(result.appLagStableReleases.map(({ tagName }) => tagName), ["v2026.9.5-10", "v2026.9.5-2"]);
+  assert.equal(result.latestAppStable["aarch64-darwin"].version, "2026.9.5");
+  assert.deepEqual(result.appLagStableReleases["aarch64-darwin"].map(({ tagName }) => tagName), ["v2026.9.5-10", "v2026.9.5-2"]);
 }
 
 const invalidReleases = [
@@ -173,3 +172,25 @@ assert.equal(selectOpenClawRelease([...invalidReleases, release("2026.9.5")]).la
 assert.equal(selectOpenClawRelease(invalidReleases).latestStableSource, null);
 assert.equal(selectOpenClawRelease([release("2026.9.9"), release("2026.10.1")]).latestStableSource.releaseVersion, "2026.10.1");
 assert.equal(selectOpenClawRelease([{ tagName: "v2026.9.5" }]).latestStableSource.releaseVersion, "2026.9.5");
+
+const linuxVersion = "2026.9.5-2";
+const linuxAsset = {
+  name: `OpenClaw-${linuxVersion}-amd64.deb`,
+  browser_download_url: `https://github.com/openclaw/openclaw/releases/download/v${linuxVersion}/OpenClaw-${linuxVersion}-amd64.deb`,
+};
+const mixed = selectOpenClawRelease([
+  release("2026.9.9", false),
+  { ...release(linuxVersion, false), assets: [linuxAsset] },
+  release("2026.9.5"),
+]);
+assert.equal(mixed.latestStableSource.releaseVersion, "2026.9.9");
+assert.equal(mixed.latestAppStable["x86_64-linux"].version, linuxVersion);
+assert.equal(mixed.latestAppStable["x86_64-linux"].url, linuxAsset.browser_download_url);
+assert.equal(mixed.latestAppStable["aarch64-darwin"].version, "2026.9.5");
+assert.deepEqual(mixed.appLagStableReleases["x86_64-linux"].map(({tagName}) => tagName), ["v2026.9.9"]);
+for (const name of [`OpenClaw-${linuxVersion}-arm64.deb`, `OpenClaw-${linuxVersion}-amd64.AppImage`]) {
+  const result = selectOpenClawRelease([{ ...release(linuxVersion, false), assets: [{ ...linuxAsset, name }] }]);
+  assert.equal(result.latestAppStable["x86_64-linux"], null);
+  assert.equal(result.latestStableSource.releaseVersion, linuxVersion);
+}
+

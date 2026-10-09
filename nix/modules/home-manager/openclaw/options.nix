@@ -152,8 +152,8 @@ in
 
     package = lib.mkOption {
       type = lib.types.package;
-      default = pkgs.openclaw;
-      description = "OpenClaw batteries-included package.";
+      default = openclawLib.defaultGatewayPackage;
+      description = "OpenClaw gateway and batteries, without the desktop application.";
     };
 
     toolNames = lib.mkOption {
@@ -166,18 +166,6 @@ in
       type = lib.types.listOf lib.types.str;
       default = [ ];
       description = "Tool names to remove from the built-in toolchain.";
-    };
-
-    appPackage = lib.mkOption {
-      type = lib.types.nullOr lib.types.package;
-      default = null;
-      description = "Optional OpenClaw app package (defaults to package if unset).";
-    };
-
-    installApp = lib.mkOption {
-      type = lib.types.bool;
-      default = true;
-      description = "Install OpenClaw.app at the default location.";
     };
 
     stateDir = lib.mkOption {

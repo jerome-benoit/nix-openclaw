@@ -20,10 +20,29 @@ pkgs.testers.nixosTest {
         home = "/home/alice";
         extraGroups = [ "wheel" ];
       };
+      users.users.desktop = {
+        isNormalUser = true;
+        uid = 1001;
+        home = "/home/desktop";
+      };
 
       home-manager = {
         useGlobalPkgs = true;
         useUserPackages = true;
+        users.desktop = {
+          imports = [ ../modules/home-manager/openclaw-desktop.nix ];
+          home = {
+            username = "desktop";
+            homeDirectory = "/home/desktop";
+            stateVersion = "23.11";
+          };
+          manual = {
+            html.enable = false;
+            json.enable = false;
+            manpages.enable = false;
+          };
+          programs.openclaw.desktop.enable = true;
+        };
         users.alice =
           { config, lib, ... }:
           let
@@ -70,7 +89,7 @@ pkgs.testers.nixosTest {
                   source = toString ../tests/plugins/alpha/skill;
                 }
               ];
-              installApp = false;
+              desktop.enable = false;
               launchd.enable = false;
               instances.default = {
                 stateDir = "~/openclaw state";

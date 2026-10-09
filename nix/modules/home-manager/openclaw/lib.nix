@@ -14,14 +14,17 @@ let
     excludeToolNames = effectiveExcludeTools;
   };
   toolOverridesEnabled = cfg.toolNames != null || effectiveExcludeTools != [ ];
-  overlayPackage = pkgs.openclaw or null;
+  defaultGatewayPackage =
+    if pkgs ? openclaw then pkgs.openclaw.override { openclaw-app = null; } else null;
   toolSets = import ../../../tools/extended.nix ({ inherit pkgs; } // toolOverrides);
   defaultPackage =
-    if toolOverridesEnabled && overlayPackage != null && cfg.package == overlayPackage then
-      (pkgs.openclawPackages.withTools toolOverrides).openclaw
+    if
+      toolOverridesEnabled && defaultGatewayPackage != null && cfg.package == defaultGatewayPackage
+    then
+      (pkgs.openclawPackages.withTools toolOverrides).openclaw.override { openclaw-app = null; }
     else
       cfg.package;
-  appPackage = if cfg.appPackage != null then cfg.appPackage else defaultPackage;
+  appPackage = cfg.desktop.package;
   qmdPackage = pkgs.openclawPackages.qmd or null;
   generatedConfigOptions = import ../../../generated/openclaw-config-options.nix { lib = lib; };
   agentOptions = generatedConfigOptions.agents.type.getSubOptions [ ];
@@ -95,6 +98,7 @@ in
     toolOverrides
     toolOverridesEnabled
     toolSets
+    defaultGatewayPackage
     defaultPackage
     appPackage
     qmdPackage

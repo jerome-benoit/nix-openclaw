@@ -4,7 +4,7 @@
 
 > Declarative OpenClaw. Bulletproof by default.
 >
-> macOS + Linux (headless). Windows is out of scope for now.
+> macOS + Linux (desktop or headless). Windows is out of scope for now.
 >
 > <sub>Questions? Join the OpenClaw Discord at https://discord.gg/clawd and ask in **#golden-path-deployments**.</sub>
 
@@ -60,11 +60,45 @@ Bot: *runs whisper, sends you text*
 
 You talk to Telegram, your machine does things.
 
-**One flake, everything works.** Gateway everywhere; runtime dependencies bundled; macOS app on macOS.
+**One flake, everything works.** Gateway and runtime dependencies bundled; native desktop components for macOS ARM64 and Linux x86_64.
 
 **Tool plugins are self-contained.** Each nix-openclaw tool plugin declares its CLI tools in Nix. You enable it, the build and wiring happens automatically.
 
 **Pinned packages.** Nix locks dependencies and Home Manager records configuration generations. Those generations do not back up or rewind OpenClaw's mutable state.
+
+### Desktop application only
+
+Import the standalone Home Manager module to install the native desktop without
+provisioning a gateway, services, plugins, `openclaw.json`, or Nix-mode app
+preferences. An explicit package works without the gateway overlay:
+
+```nix
+{ inputs, pkgs, ... }: {
+  imports = [ inputs.nix-openclaw.homeManagerModules.openclaw-desktop ];
+  programs.openclaw.desktop = {
+    enable = true;
+    package = inputs.nix-openclaw.packages.${pkgs.stdenv.hostPlatform.system}.openclaw-app;
+  };
+}
+```
+
+Home Manager handles macOS application linking and Linux desktop menu entries.
+Configure a remote gateway or choose local setup in the app; any local gateway
+installation then belongs to the app, not this module. Standalone
+`nix-openclaw-tools` can be installed alongside it.
+
+The full `homeManagerModules.openclaw` module composes the desktop module. Desktop
+installation defaults to enabled on macOS and disabled on Linux, preserving
+existing headless deployments. Set `programs.openclaw.desktop.enable = true` to
+enable it on Linux, or `false` for a managed gateway without desktop installation.
+The default gateway bundle excludes the desktop, so disabling this option does
+not reinstall the app indirectly.
+
+Migration: replace `programs.openclaw.installApp` with `desktop.enable` and
+`programs.openclaw.appPackage` with `desktop.package`. The desktop package is now
+independent of the gateway package. On macOS, the default app moves from
+`~/Applications/OpenClaw.app` to Home Manager’s application directory; explicit
+per-instance app installation paths remain available.
 
 ---
 
@@ -997,22 +1031,25 @@ The gateway tracks the newest upstream stable OpenClaw source release that satis
 - gateway builds on Linux and macOS
 - gateway starts and answers local health checks
 
-The macOS app is pinned separately to the newest stable public `OpenClaw-*.zip` artifact. If upstream has not promoted desktop assets for the latest source release yet, `openclaw-app` may lag; that must not block Linux users or macOS gateway users from getting the latest packaged OpenClaw gateway.
+Desktop artifacts are pinned independently per platform: the universal public
+macOS ZIP and the Linux x86_64 DEB. A missing desktop artifact preserves that
+platform’s previous pin without blocking newer gateway releases or the other
+desktop platform.
 
-The Nix gate is deliberately package-focused. It does not make the full upstream Vitest suite a hard promotion gate; upstream owns source test health, while `nix-openclaw` verifies the npm-shrinkwrapped gateway package, package contents, smoke startup, module activation, generated config materialization during pin updates, and newest available macOS app artifact.
+The Nix gate is deliberately package-focused. It does not make the full upstream Vitest suite a hard promotion gate; upstream owns source test health, while `nix-openclaw` verifies the npm-shrinkwrapped gateway package, package contents, smoke startup, module activation, generated config materialization during pin updates, and pinned desktop artifacts.
 
 Outputs:
 ```
 .#openclaw
 .#openclaw-gateway
-.#openclaw-app   # Darwin only
+.#openclaw-app   # aarch64-darwin and x86_64-linux
 ```
 
 `.#openclaw-gateway` and `.#openclaw-app` are component outputs for modules, CI, debugging, and advanced use. Start with `.#openclaw`.
 
 Pins live in:
 - `nix/sources/openclaw-source.nix`
-- `nix/packages/openclaw-app.nix`
+- `nix/sources/openclaw-app.json`
 
 ### Responsibilities (who owns what)
 
@@ -1023,9 +1060,9 @@ Pins live in:
 ### Automated pipeline
 
 1) Hourly **Pin Stable OpenClaw Version** polls upstream stable OpenClaw releases.
-2) It selects the newest stable source release and newest stable public macOS app zip independently.
-3) Newer source releases that lack public macOS app assets are reported as app lag, not skipped.
-4) The stable pin workflow materializes the source pin from the newest source tag ref, updates the app asset pin from the newest public app zip, and regenerates config options from the selected source.
+2) It selects the newest stable source release and each platform’s newest stable public desktop artifact independently.
+3) Missing desktop assets are reported as platform-specific app lag, not a reason to skip newer gateway releases.
+4) The stable pin workflow materializes the source pin, updates available desktop artifact pins, and regenerates config options from the selected source.
 5) The stable pin workflow validates that source/app pin set on the same Linux + macOS contract as repository `CI`.
 6) Only after both validations pass does the workflow push one release-mirroring commit to `main`.
 

@@ -8,7 +8,8 @@ This repo ships a working Nix package for OpenClaw users, not just a pin mirror.
 - `openclaw-gateway` is the runnable gateway for Linux and macOS. Stable pins
   use upstream's npm package/shrinkwrap by default; source builds remain for
   explicit source overrides.
-- `openclaw-app` is the Darwin-only desktop app from upstream's public app artifact.
+- `openclaw-app` is the standalone desktop companion for `aarch64-darwin` and
+  `x86_64-linux`, using upstream's signed public ZIP and official amd64 DEB.
 - Component outputs exist for modules, checks, and debugging. They are not separate product tracks.
 - Do not add dogfood package tracks. If maintainers need to test an unreleased
   upstream source, use an explicit source override instead of adding another
@@ -32,6 +33,26 @@ This repo ships a working Nix package for OpenClaw users, not just a pin mirror.
 ## Build Contract
 
 - The gateway package must include Control UI assets.
+- Desktop artifacts live in `nix/sources/openclaw-app.json`, independently pinned
+  by platform. Darwin uses the unpacked ZIP hash and skips fixup to preserve its
+  signature; Linux uses the raw DEB hash, `dpkg`, `autoPatchelfHook` and
+  `wrapGAppsHook3`. Never use one platform's hash for another.
+- Linux installs `bin/openclaw-desktop`, `lib/OpenClaw/install-cli.sh` (Tauri's
+  executable-relative resource directory), the upstream icons and an absolute
+  `.desktop` Exec. Its closure supplies WebKitGTK 4.1, GTK 3, GStreamer codecs,
+  Ayatana tray support and libxdotool. Desktop-session services and credentials
+  remain the host session's responsibility.
+- The public `openclaw` bundle includes the desktop on both platforms.
+  `openclaw.override { openclaw-app = null; }` excludes it completely, retaining
+  the gateway and internal tools only. The Linux desktop executable is public,
+  not an internal runtime tool.
+- For a Linux desktop smoke, launch the built component with a scratch HOME,
+  scratch XDG directories, Xvfb and a private D-Bus session. Inspect the welcome
+  screen, choose another computer, and exercise the remote connection form;
+  never install a local gateway or service. An unavailable test endpoint does
+  not qualify as authenticated gateway connectivity. An Xvfb run does not prove
+  native tray integration, hardware acceleration or media playback. Evaluate
+  Darwin on Linux without claiming native macOS execution.
 - No inline scripts or inline file contents in Nix code. Use repo scripts and explicit file paths.
 - Keep runtime tools internal to the `openclaw` wrapper unless they are intentionally part of the public package surface.
 - QMD backend integration is legacy-only: the generated `memory.backend` option must accept `"qmd"`. Keep legacy opt-in internal to the OpenClaw runtime PATH. Newer schemas reject retired QMD configuration without translating it; standalone CLI packaging and explicit model prewarming remain supported.

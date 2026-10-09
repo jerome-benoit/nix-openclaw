@@ -3,7 +3,7 @@ set -euo pipefail
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 source_file="$repo_root/nix/sources/openclaw-source.nix"
-app_file="$repo_root/nix/packages/openclaw-app.nix"
+app_file="$repo_root/nix/sources/openclaw-app.json"
 
 mode="${1:-check}"
 case "$mode" in
@@ -86,6 +86,7 @@ write_release_notes() {
     printf '%s\n' 'Pins:'
     printf '%s\n' "- OpenClaw source: [\`$tag\`]($upstream_release_url) (\`$source_rev\`)"
     printf '%s\n' "- macOS app artifact: [\`OpenClaw-${source_version}.zip\`]($upstream_release_url)"
+    printf '%s\n' "- Linux app artifact: [\`OpenClaw-${source_version}-amd64.deb\`]($upstream_release_url)"
     printf '%s\n' "- nix-openclaw commit: \`$head_sha\`"
     if [[ -n "$ci_run_url" ]]; then
       printf '%s\n' "- CI proof: $ci_run_url"
@@ -141,19 +142,17 @@ sync_github_release() {
   fi
 }
 
-require_cmds awk git
+require_cmds awk git jq
 
 source_tag=$(field "$source_file" "releaseTag")
 source_version=$(field "$source_file" "releaseVersion")
 source_rev=$(field "$source_file" "rev")
-app_version=$(field "$app_file" "version")
-app_url=$(field "$app_file" "url")
+app_versions=$(jq -c 'map_values(.version)' "$app_file")
 
 require_clean_value "openclaw-source.releaseTag" "$source_tag"
 require_clean_value "openclaw-source.releaseVersion" "$source_version"
 require_clean_value "openclaw-source.rev" "$source_rev"
-require_clean_value "openclaw-app.version" "$app_version"
-require_clean_value "openclaw-app.url" "$app_url"
+require_clean_value "openclaw-app.versions" "$app_versions"
 
 tag="$source_tag"
 eligible=true
@@ -162,10 +161,13 @@ skip_reason=""
 if [[ "$source_tag" != "v${source_version}" ]]; then
   eligible=false
   skip_reason="source-tag-version-mismatch"
-elif [[ "$app_version" != "$source_version" ]]; then
+elif ! jq -e --arg version "$source_version" 'all(.[]; .version == $version)' "$app_file" >/dev/null; then
   eligible=false
   skip_reason="source-app-version-mismatch"
-elif [[ "$app_url" != *"/releases/download/${source_tag}/OpenClaw-${source_version}.zip" ]]; then
+elif ! jq -e --arg version "$source_version" '
+  .["aarch64-darwin"].url == ("https://github.com/openclaw/openclaw/releases/download/v" + $version + "/OpenClaw-" + $version + ".zip") and
+  .["x86_64-linux"].url == ("https://github.com/openclaw/openclaw/releases/download/v" + $version + "/OpenClaw-" + $version + "-amd64.deb")
+' "$app_file" >/dev/null; then
   eligible=false
   skip_reason="app-artifact-url-mismatch"
 fi
@@ -173,7 +175,7 @@ fi
 emit_output "tag" "$tag"
 emit_output "source_version" "$source_version"
 emit_output "source_rev" "$source_rev"
-emit_output "app_version" "$app_version"
+emit_output "app_versions" "$app_versions"
 emit_output "eligible" "$eligible"
 emit_output "skip_reason" "$skip_reason"
 
@@ -184,7 +186,7 @@ if [[ "$eligible" != "true" ]]; then
 - Tag: \`$tag\`
 - Reason: \`$skip_reason\`
 - Source version: \`$source_version\`
-- App version: \`$app_version\`
+- App versions by platform: \`$app_versions\`
 "
   exit 0
 fi
@@ -221,11 +223,13 @@ if [[ "$upstream_draft" == "true" || "$upstream_prerelease" == "true" ]]; then
   exit 1
 fi
 
-app_asset_count=$(gh release view "$tag" --repo openclaw/openclaw --json assets --jq "[.assets[] | select(.name == \"OpenClaw-${source_version}.zip\")] | length")
-if [[ "$app_asset_count" != "1" ]]; then
-  echo "Refusing to publish mirrored tag $tag: upstream release does not expose OpenClaw-${source_version}.zip" >&2
-  exit 1
-fi
+for app_asset in "OpenClaw-${source_version}.zip" "OpenClaw-${source_version}-amd64.deb"; do
+  app_asset_count=$(gh release view "$tag" --repo openclaw/openclaw --json assets --jq "[.assets[] | select(.name == \"${app_asset}\")] | length")
+  if [[ "$app_asset_count" != "1" ]]; then
+    echo "Refusing to publish mirrored tag $tag: upstream release does not expose $app_asset" >&2
+    exit 1
+  fi
+done
 
 if git show-ref --verify --quiet "refs/tags/${tag}"; then
   tag_sha=$(git rev-parse "refs/tags/${tag}^{commit}")
@@ -259,5 +263,6 @@ summary "### Mirrored release tag published
 - Target: \`$head_sha\`
 - OpenClaw source: \`$tag\` (\`$source_rev\`)
 - macOS app artifact: \`OpenClaw-${source_version}.zip\`
+- Linux app artifact: \`OpenClaw-${source_version}-amd64.deb\`
 - Release: synced
 "

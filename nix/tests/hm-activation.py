@@ -8,6 +8,15 @@ machine.wait_until_succeeds(
     "systemctl show -p SubState home-manager-alice.service | grep -Eq '^SubState=(dead|exited)$'"
 )
 
+machine.wait_for_unit("home-manager-desktop.service")
+desktop_profile = "/etc/profiles/per-user/desktop"
+machine.succeed(f"test -x {desktop_profile}/bin/openclaw-desktop")
+machine.succeed(f"test ! -e {desktop_profile}/bin/openclaw")
+machine.succeed("test ! -e /home/desktop/.openclaw")
+machine.succeed("test ! -e /home/desktop/.config/systemd/user/openclaw-gateway.service")
+machine.succeed("test ! -e /home/desktop/.local/share/nix-openclaw")
+machine.succeed("test ! -e /etc/profiles/per-user/alice/bin/openclaw-desktop")
+
 state_dir = "/home/alice/openclaw state"
 config_path = shlex.quote(f"{state_dir}/config with spaces and 'quotes'.json")
 machine.wait_until_succeeds(f"test -f {config_path}")

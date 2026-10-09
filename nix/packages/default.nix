@@ -7,7 +7,6 @@
   excludeToolNames ? [ ],
 }:
 let
-  isDarwin = pkgs.stdenv.hostPlatform.isDarwin;
   pnpm_11 = pkgs.callPackage ./pnpm-11.nix { };
   pnpm_12 = pkgs.callPackage ./pnpm-12.nix { };
   pnpmByMajor = {
@@ -43,7 +42,7 @@ let
   openclawRuntimePlugins = pkgs.lib.mapAttrs (
     _name: lock: buildOpenClawRuntimePlugin lock
   ) runtimePluginLocks;
-  openclawApp = if isDarwin then pkgs.callPackage ./openclaw-app.nix { } else null;
+  openclawApp = pkgs.callPackage ./openclaw-app.nix { };
   openclawBundle = pkgs.callPackage ./openclaw-batteries.nix {
     openclaw-gateway = openclawGateway;
     openclaw-app = openclawApp;
@@ -57,6 +56,6 @@ in
   inherit openclawRuntimePlugins;
   qmd = qmdPackage;
   openclaw-gateway = openclawGateway;
+  openclaw-app = openclawApp;
   openclaw = openclawBundle;
 }
-// (if isDarwin then { openclaw-app = openclawApp; } else { })

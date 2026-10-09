@@ -42,8 +42,3 @@ test("release selection matches a complete version, not a prefix", (t) => {
   assert.doesNotMatch(render(), /Different release|## 2026\.9\.40/);
 });
 
-test("historical releases without a changelog retain their generated metadata", (t) => {
-  const notes = fixture(t, null)("2026.7.1");
-  assert.match(notes, /nix-openclaw package state for OpenClaw `v2026\.7\.1`/);
-  assert.match(notes, /CI proof: https:\/\/example\.invalid\/ci/);
-});

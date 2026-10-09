@@ -39,7 +39,7 @@ let
   evaluated = helpers.moduleEval {
     package = pkgs.writeShellScriptBin "openclaw" (builtins.readFile (fixtures + "/cli.sh"));
     toolNames = [ ];
-    installApp = false;
+    desktop.enable = false;
     environment = values;
     instances.default = {
       appDefaults.enable = false;

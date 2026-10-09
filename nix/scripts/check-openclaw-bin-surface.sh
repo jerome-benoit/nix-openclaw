@@ -16,7 +16,7 @@ fi
 
 extra_bins="$(find "$bin_dir" -mindepth 1 -maxdepth 1 -print | while IFS= read -r entry; do
   name="$(basename "$entry")"
-  if [ "$name" != "openclaw" ]; then
+  if [ "$name" != "openclaw" ] && [ "$name" != "openclaw-desktop" ]; then
     printf '%s\n' "$name"
   fi
 done)"
