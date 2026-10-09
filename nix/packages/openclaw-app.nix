@@ -2,26 +2,77 @@
   lib,
   stdenvNoCC,
   fetchzip,
+  fetchurl,
+  dpkg,
+  autoPatchelfHook,
+  wrapGAppsHook3,
+  gtk3,
+  webkitgtk_4_1,
+  libayatana-appindicator,
+  xdotool,
+  gst_all_1,
 }:
-
+let
+  system = stdenvNoCC.hostPlatform.system;
+  artifacts = builtins.fromJSON (builtins.readFile ../sources/openclaw-app.json);
+  artifact = artifacts.${system} or (throw "Unsupported OpenClaw desktop platform: ${system}");
+  isDarwin = stdenvNoCC.hostPlatform.isDarwin;
+in
 stdenvNoCC.mkDerivation {
   pname = "openclaw-app";
-  version = "2026.9.5";
+  inherit (artifact) version;
 
-  src = fetchzip {
-    url = "https://github.com/openclaw/openclaw/releases/download/v2026.9.5/OpenClaw-2026.9.5.zip";
-    hash = "sha256-M0JvLpSWhdA4aKsZE5/XqN3ODUmbfSU2IUrca/g0fLI=";
-    stripRoot = false;
-  };
+  src =
+    if isDarwin then
+      fetchzip {
+        inherit (artifact) url hash;
+        stripRoot = false;
+      }
+    else
+      fetchurl { inherit (artifact) url hash; };
 
   dontUnpack = true;
+  dontConfigure = true;
+  dontBuild = true;
+  env.STDENV_SETUP = "${stdenvNoCC}/setup";
+  # The public Darwin bundle is signed; never strip or patch its contents.
+  dontFixup = isDarwin;
 
-  installPhase = "${../scripts/openclaw-app-install.sh}";
+  nativeBuildInputs = lib.optionals (!isDarwin) [
+    dpkg
+    autoPatchelfHook
+    wrapGAppsHook3
+  ];
+  buildInputs = lib.optionals (!isDarwin) [
+    gtk3
+    webkitgtk_4_1
+    libayatana-appindicator
+    xdotool
+    gst_all_1.gstreamer
+    gst_all_1.gst-plugins-base
+    gst_all_1.gst-plugins-good
+    gst_all_1.gst-plugins-bad
+    gst_all_1.gst-libav
+  ];
+  # The tray backend and global shortcuts dlopen these libraries.
+  runtimeDependencies = lib.optionals (!isDarwin) [
+    libayatana-appindicator
+    xdotool
+  ];
 
-  meta = with lib; {
-    description = "OpenClaw macOS app bundle";
-    homepage = "https://github.com/openclaw/openclaw";
-    license = licenses.mit;
-    platforms = platforms.darwin;
-  };
+  installPhase =
+    if isDarwin then
+      "${../scripts/openclaw-app-install.sh}"
+    else
+      "bash ${../scripts/openclaw-app-linux-install.sh}";
+
+  meta =
+    with lib;
+    {
+      description = "OpenClaw desktop companion";
+      homepage = "https://github.com/openclaw/openclaw";
+      license = licenses.mit;
+      platforms = builtins.attrNames artifacts;
+    }
+    // lib.optionalAttrs (!isDarwin) { mainProgram = "openclaw-desktop"; };
 }

@@ -21,9 +21,7 @@ jobs:
       source_tag: ${{ steps.select.outputs.source_tag }}
       source_sha: ${{ steps.select.outputs.source_sha }}
       source_version: ${{ steps.select.outputs.source_version }}
-      app_tag: ${{ steps.select.outputs.app_tag }}
-      app_url: ${{ steps.select.outputs.app_url }}
-      app_version: ${{ steps.select.outputs.app_version }}
+      app_artifacts: ${{ steps.select.outputs.app_artifacts }}
       latest_stable_tag: ${{ steps.select.outputs.latest_stable_tag }}
       app_lag_releases: ${{ steps.select.outputs.app_lag_releases }}
     steps:
@@ -46,7 +44,7 @@ jobs:
 
           has_update="$(printf '%s\n' "$selection" | awk -F= '$1 == "has_update" { print $2; exit }')"
           source_tag="$(printf '%s\n' "$selection" | awk -F= '$1 == "source_tag" { print $2; exit }')"
-          app_tag="$(printf '%s\n' "$selection" | awk -F= '$1 == "app_tag" { print $2; exit }')"
+          app_artifacts="$(printf '%s\n' "$selection" | awk -F= '$1 == "app_artifacts" { print $2; exit }')"
           latest_stable_tag="$(printf '%s\n' "$selection" | awk -F= '$1 == "latest_stable_tag" { print $2; exit }')"
           app_lag_releases="$(printf '%s\n' "$selection" | awk -F= '$1 == "app_lag_releases" { print $2; exit }')"
 
@@ -55,10 +53,10 @@ jobs:
             echo
             echo "- Latest stable upstream release: \`${latest_stable_tag:-unknown}\`"
             echo "- Selected source release: \`${source_tag:-unknown}\`"
-            echo "- Selected macOS app artifact: \`${app_tag:-preserve-current}\`"
+            echo "- Selected desktop artifacts: \`${app_artifacts:-preserve-current}\`"
             echo "- Update needed: \`${has_update:-unknown}\`"
             if [[ -n "${app_lag_releases:-}" ]]; then
-              echo "- macOS app asset lagging source release(s): \`${app_lag_releases}\`"
+              echo "- Desktop artifact lag by platform: \`${app_lag_releases}\`"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -86,8 +84,7 @@ jobs:
           scripts/update-pins.sh apply \
             "${{ needs.select.outputs.source_tag }}" \
             "${{ needs.select.outputs.source_sha }}" \
-            "${{ needs.select.outputs.app_tag }}" \
-            "${{ needs.select.outputs.app_url }}"
+            '${{ needs.select.outputs.app_artifacts }}'
 
       - name: Record materialized diff digest
         id: materialization
@@ -178,8 +175,7 @@ jobs:
           scripts/update-pins.sh apply \
             "${{ needs.select.outputs.source_tag }}" \
             "${{ needs.select.outputs.source_sha }}" \
-            "${{ needs.select.outputs.app_tag }}" \
-            "${{ needs.select.outputs.app_url }}"
+            '${{ needs.select.outputs.app_artifacts }}'
 
       - name: Record materialized diff digest
         id: materialization
@@ -322,8 +318,7 @@ jobs:
           scripts/update-pins.sh apply \
             "${{ needs.select.outputs.source_tag }}" \
             "${{ needs.select.outputs.source_sha }}" \
-            "${{ needs.select.outputs.app_tag }}" \
-            "${{ needs.select.outputs.app_url }}"
+            '${{ needs.select.outputs.app_artifacts }}'
 
           pin_files=()
           while IFS= read -r file; do

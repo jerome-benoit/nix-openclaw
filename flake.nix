@@ -265,6 +265,7 @@
       };
       nixosModules.openclaw-gateway = import ./nix/modules/nixos/openclaw-gateway.nix;
       homeManagerModules.openclaw = import ./nix/modules/home-manager/openclaw.nix;
+      homeManagerModules.openclaw-desktop = import ./nix/modules/home-manager/openclaw-desktop.nix;
       darwinModules.openclaw = import ./nix/modules/darwin/openclaw.nix;
     };
 }

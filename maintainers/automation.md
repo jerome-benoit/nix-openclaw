@@ -13,14 +13,15 @@ Does nix-openclaw publish the latest upstream version for both supported tracks?
 Answer `YES` only when:
 
 - `openclaw-gateway` matches the newest stable upstream source release.
-- `openclaw-app` matches the newest stable upstream release with a published public `OpenClaw-*.zip`.
+- `openclaw-app` matches the newest stable published public artifact for each
+  platform: universal Darwin ZIP and Linux amd64 DEB.
 
 If both tracks are current and stable pin automation/CI are healthy, stop with a short CTO-level report:
 
 - current gateway
 - latest upstream gateway
-- current app
-- latest published app
+- current desktop pin by platform
+- latest published desktop artifact by platform
 - whether action was needed
 
 ## Repair Loop
@@ -52,7 +53,9 @@ Do not ask for a repair strategy when the desired state is clear.
 
 If the fix belongs in `nix-openclaw`, edit the repo, self-review the diff until there are no actionable findings, run the relevant targeted checks plus the full gate, commit directly to `main`, push directly to `main`, and verify GitHub Actions on the pushed commit.
 
-If upstream has not published public macOS app assets, call that out directly, keep the app pin on the newest public zip, keep packaging the latest stable gateway, and repair `nix-openclaw` only if it fails to do that.
+If upstream has not published desktop assets for a platform, report that
+platform's lag, preserve its existing public artifact pin and keep packaging the
+latest stable gateway. Repair `nix-openclaw` only if it fails to do that.
 
 ## Runtime plugin lock checks
 

@@ -1,0 +1,12 @@
+{
+  "aarch64-darwin": {
+    "version": "2026.9.5",
+    "url": "https://github.com/openclaw/openclaw/releases/download/v2026.9.5/OpenClaw-2026.9.5.zip",
+    "hash": "sha256-M0JvLpSWhdA4aKsZE5/XqN3ODUmbfSU2IUrca/g0fLI="
+  },
+  "x86_64-linux": {
+    "version": "2026.9.5",
+    "url": "https://github.com/openclaw/openclaw/releases/download/v2026.9.5/OpenClaw-2026.9.5-amd64.deb",
+    "hash": "sha256-UPa0HK2YPBgm+aB6NMBiBTqerys/OKDmaYkfG0y8RX8="
+  }
+}

@@ -9,7 +9,6 @@ let
   openclawLib = import ./lib.nix { inherit config lib pkgs; };
   cfg = openclawLib.cfg;
   homeDir = openclawLib.homeDir;
-  appPackage = openclawLib.appPackage;
   qmdPackage = openclawLib.qmdPackage;
 
   defaultInstance = {
@@ -31,7 +30,7 @@ let
     runtimePluginSources = cfg.runtimePluginSources;
     config = { };
     appDefaults = {
-      enable = true;
+      enable = cfg.desktop.enable;
       attachExistingOnly = true;
       nixMode = true;
     };
@@ -161,6 +160,8 @@ let
 in
 {
   config = lib.mkIf (cfg.enable || cfg.instances != { }) {
+    programs.openclaw.desktop.enable = lib.mkDefault pkgs.stdenv.hostPlatform.isDarwin;
+
     assertions = [
       {
         assertion = lib.length (lib.attrNames appDefaultsEnabled) <= 1;
@@ -189,13 +190,6 @@ in
 
     home.file = lib.mkMerge [
       (lib.listToAttrs (map (item: item.homeFile) instanceConfigs))
-      (lib.optionalAttrs (pkgs.stdenv.hostPlatform.isDarwin && appPackage != null && cfg.installApp) {
-        "Applications/OpenClaw.app" = {
-          source = "${appPackage}/Applications/OpenClaw.app";
-          recursive = true;
-          force = true;
-        };
-      })
       (lib.listToAttrs appInstalls)
       plugins.pluginConfigFiles
       (lib.optionalAttrs cfg.reloadScript.enable {

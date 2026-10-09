@@ -16,6 +16,7 @@
       "openclaw"
       "plugins"
     ] "Use programs.openclaw.customPlugins.")
+    ../openclaw-desktop.nix
     ./options.nix
     ./config.nix
   ];

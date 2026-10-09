@@ -35,7 +35,11 @@ stdenvNoCC.mkDerivation {
   installPhase = "${../scripts/openclaw-batteries-install.sh}";
 
   meta = with lib; {
-    description = "OpenClaw batteries-included bundle (gateway + app + tools)";
+    description =
+      if openclaw-app == null then
+        "OpenClaw batteries-included bundle (gateway + tools)"
+      else
+        "OpenClaw batteries-included bundle (gateway + app + tools)";
     homepage = "https://github.com/openclaw/openclaw";
     license = licenses.mit;
     platforms = platforms.darwin ++ platforms.linux;

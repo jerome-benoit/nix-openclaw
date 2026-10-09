@@ -28,39 +28,30 @@ export function selectOpenClawRelease(releases) {
   const latestStableSource = latestStable
     ? stableSourceSelection(latestStable)
     : null;
-  const appLagStableReleases = [];
-
-  for (const release of stableReleases) {
-    const tagName = release.tag_name ?? release.tagName;
-    // The shared Darwin pin must serve both architectures, even when thin ZIPs
-    // appear before the universal app in the upstream asset list.
-    const universalAppName = `OpenClaw-${tagName.replace(/^v/, "")}.zip`;
-    const appAsset = (release.assets ?? []).find(
-      (asset) =>
-        asset?.name === universalAppName && Boolean(asset?.browser_download_url),
-    );
-
-    if (!appAsset) {
-      appLagStableReleases.push({
-        tagName,
-        reason: "missing-macos-zip",
-      });
-      continue;
+  const latestAppStable = {};
+  const appLagStableReleases = {};
+  const suffixes = { "aarch64-darwin": ".zip", "x86_64-linux": "-amd64.deb" };
+  for (const [system, suffix] of Object.entries(suffixes)) {
+    latestAppStable[system] = null;
+    appLagStableReleases[system] = [];
+    for (const release of stableReleases) {
+      const tagName = release.tag_name ?? release.tagName;
+      // Match the public universal ZIP or amd64 DEB exactly, never a thin ZIP,
+      // debug-symbol archive, AppImage, or artifact for a different architecture.
+      const appName = `OpenClaw-${tagName.replace(/^v/, "")}${suffix}`;
+      const appAsset = (release.assets ?? []).find(
+        (asset) => asset?.name === appName && Boolean(asset?.browser_download_url),
+      );
+      if (!appAsset) {
+        appLagStableReleases[system].push({ tagName, reason: `missing-${system}-artifact` });
+        continue;
+      }
+      latestAppStable[system] = {
+        version: tagName.replace(/^v/, ""),
+        url: appAsset.browser_download_url,
+      };
+      break;
     }
-
-    return {
-      latestStable: latestStableSource
-        ? { tagName: latestStableSource.tagName }
-        : null,
-      latestStableSource,
-      latestMacAppStable: {
-        tagName,
-        releaseVersion: tagName.replace(/^v/, ""),
-        appAssetName: appAsset.name,
-        appUrl: appAsset.browser_download_url,
-      },
-      appLagStableReleases,
-    };
   }
 
   return {
@@ -68,7 +59,7 @@ export function selectOpenClawRelease(releases) {
       ? { tagName: latestStableSource.tagName }
       : null,
     latestStableSource,
-    latestMacAppStable: null,
+    latestAppStable,
     appLagStableReleases,
   };
 }

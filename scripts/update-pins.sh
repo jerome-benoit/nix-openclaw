@@ -8,7 +8,7 @@ fi
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 source_file="$repo_root/nix/sources/openclaw-source.nix"
-app_file="$repo_root/nix/packages/openclaw-app.nix"
+app_file="$repo_root/nix/sources/openclaw-app.json"
 config_options_file="$repo_root/nix/generated/openclaw-config-options.nix"
 gateway_npm_wrapper_dir="$repo_root/nix/npm/openclaw"
 runtime_plugin_lock_rel_dir="nix/generated/openclaw-runtime-plugins"
@@ -20,6 +20,8 @@ apply_success=0
 
 # shellcheck source=scripts/lib/pin-source.sh
 . "$repo_root/scripts/lib/pin-source.sh"
+# shellcheck source=scripts/lib/pin-app.sh
+. "$repo_root/scripts/lib/pin-app.sh"
 
 log() {
   printf '>> %s\n' "$*" >&2
@@ -30,7 +32,7 @@ usage() {
 Usage:
   scripts/update-pins.sh files
   scripts/update-pins.sh select
-  scripts/update-pins.sh apply <source_tag> <source_sha> <app_tag> <app_url>
+  scripts/update-pins.sh apply <source_tag> <source_sha> <app_artifacts_json>
 EOF
 }
 
@@ -179,10 +181,9 @@ refresh_npm_hash() {
 }
 
 select_release() {
-  local release_json selection_json current_rev current_app_version source_tag source_version selected_sha
-  local app_tag app_version app_url latest_stable_tag app_lag_releases has_update
+  local release_json selection_json current_rev source_tag source_version selected_sha
+  local app_artifacts latest_stable_tag app_lag_releases has_update
   current_rev=$(current_field "$source_file" "rev")
-  current_app_version=$(current_field "$app_file" "version")
 
   log "Fetching OpenClaw stable release metadata"
   release_json=$(gh api '/repos/openclaw/openclaw/releases?per_page=100')
@@ -191,10 +192,8 @@ select_release() {
   latest_stable_tag=$(printf '%s' "$selection_json" | jq -r '.latestStableSource.tagName // empty')
   source_tag=$(printf '%s' "$selection_json" | jq -r '.latestStableSource.tagName // empty')
   source_version=$(printf '%s' "$selection_json" | jq -r '.latestStableSource.releaseVersion // empty')
-  app_tag=$(printf '%s' "$selection_json" | jq -r '.latestMacAppStable.tagName // empty')
-  app_version=$(printf '%s' "$selection_json" | jq -r '.latestMacAppStable.releaseVersion // empty')
-  app_url=$(printf '%s' "$selection_json" | jq -r '.latestMacAppStable.appUrl // empty')
-  app_lag_releases=$(printf '%s' "$selection_json" | jq -r '[.appLagStableReleases[]?.tagName | select(. != null)] | join(",")')
+  app_artifacts=$(printf '%s' "$selection_json" | jq -c '.latestAppStable')
+  app_lag_releases=$(printf '%s' "$selection_json" | jq -c '.appLagStableReleases')
 
   if [[ -z "$source_tag" || -z "$source_version" ]]; then
     echo "Failed to resolve an OpenClaw stable source release" >&2
@@ -211,16 +210,10 @@ select_release() {
   fi
 
   log "Selected latest stable source release: $source_tag ($selected_sha)"
-  if [[ -n "$app_tag" ]]; then
-    log "Selected latest public macOS app release: $app_tag"
-  else
-    log "No public macOS app asset found; preserving existing app pin"
-  fi
-  if [[ -n "$app_lag_releases" ]]; then
-    log "macOS app asset lags source release(s): $app_lag_releases"
-  fi
+  log "Selected public desktop artifacts: $app_artifacts"
+  log "Desktop artifact lag by platform: $app_lag_releases"
 
-  if [[ "$current_rev" == "$selected_sha" && ( -z "$app_version" || "$current_app_version" == "$app_version" ) ]]; then
+  if [[ "$current_rev" == "$selected_sha" ]] && ! app_pins_changed "$app_artifacts"; then
     has_update=false
   else
     has_update=true
@@ -230,9 +223,7 @@ select_release() {
   printf 'source_tag=%s\n' "$source_tag"
   printf 'source_sha=%s\n' "$selected_sha"
   printf 'source_version=%s\n' "$source_version"
-  printf 'app_tag=%s\n' "$app_tag"
-  printf 'app_url=%s\n' "$app_url"
-  printf 'app_version=%s\n' "$app_version"
+  printf 'app_artifacts=%s\n' "$app_artifacts"
   printf 'latest_stable_tag=%s\n' "$latest_stable_tag"
   printf 'app_lag_releases=%s\n' "$app_lag_releases"
 }
@@ -240,9 +231,8 @@ select_release() {
 apply_release() {
   local source_tag="$1"
   local selected_sha="$2"
-  local app_tag="$3"
-  local app_url="$4"
-  local source_version source_url source_prefetch source_hash source_store_path selected_pnpm_major runtime_plugin_version public_surface_hardlinks_patch apply_skip_plugin_auto_enable_patch app_version app_hash
+  local app_artifacts="$3"
+  local source_version source_url source_prefetch source_hash source_store_path selected_pnpm_major runtime_plugin_version public_surface_hardlinks_patch apply_skip_plugin_auto_enable_patch app_pins
 
   source_version="${source_tag#v}"
   source_url="https://github.com/openclaw/openclaw/archive/${selected_sha}.tar.gz"
@@ -259,19 +249,7 @@ apply_release() {
   public_surface_hardlinks_patch=$(source_public_surface_hardlinks_patch "$source_store_path")
   apply_skip_plugin_auto_enable_patch=$(source_needs_skip_plugin_auto_enable_nix_mode_patch "$source_store_path")
 
-  if [[ -n "$app_tag" || -n "$app_url" ]]; then
-    if [[ -z "$app_tag" || -z "$app_url" ]]; then
-      echo "app_tag and app_url must either both be set or both be empty" >&2
-      exit 1
-    fi
-
-    app_version="${app_tag#v}"
-    app_hash=$(unpacked_zip_hash "$app_url")
-    if [[ -z "$app_hash" ]]; then
-      echo "Failed to resolve app hash for $app_tag" >&2
-      exit 1
-    fi
-  fi
+  app_pins=$(materialize_app_pins "$app_artifacts")
 
   apply_backup_dir=$(mktemp -d)
   apply_success=0
@@ -312,11 +290,7 @@ apply_release() {
   perl -0pi -e "s|hash = \"[^\"]+\";|hash = \"${source_hash}\";|" "$source_file"
   set_gateway_npm_deps_hash "$npm_fake_hash"
 
-  if [[ -n "${app_version:-}" ]]; then
-    perl -0pi -e "s|version = \"[^\"]+\";|version = \"${app_version}\";|" "$app_file"
-    perl -0pi -e "s|url = \"[^\"]+\";|url = \"${app_url}\";|" "$app_file"
-    perl -0pi -e "s|hash = \"[^\"]+\";|hash = \"${app_hash}\";|" "$app_file"
-  fi
+  printf '%s\n' "$app_pins" > "$app_file"
 
   refresh_npm_wrapper_locks "$source_version"
   refresh_runtime_plugin_locks
@@ -339,9 +313,9 @@ case "$mode" in
     select_release
     ;;
   apply)
-    [[ $# -eq 5 ]] || { usage; exit 1; }
+    [[ $# -eq 4 ]] || { usage; exit 1; }
     require_cmds jq nix node perl unzip find
-    apply_release "$2" "$3" "$4" "$5"
+    apply_release "$2" "$3" "$4"
     ;;
   *) usage; exit 1 ;;
 esac

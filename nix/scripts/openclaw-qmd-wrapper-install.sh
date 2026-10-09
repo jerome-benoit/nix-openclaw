@@ -32,3 +32,7 @@ bash -e -c '. "$STDENV_SETUP"; makeWrapper "$OPENCLAW_GATEWAY_BIN" "$out/bin/ope
 if [ -d "${OPENCLAW_GATEWAY_PACKAGE}/Applications" ]; then
   ln -s "${OPENCLAW_GATEWAY_PACKAGE}/Applications" "$out/Applications"
 fi
+if [ -x "$OPENCLAW_GATEWAY_PACKAGE/bin/openclaw-desktop" ]; then
+  ln -s "$OPENCLAW_GATEWAY_PACKAGE/bin/openclaw-desktop" "$out/bin/openclaw-desktop"
+  ln -s "$OPENCLAW_GATEWAY_PACKAGE/share" "$out/share"
+fi

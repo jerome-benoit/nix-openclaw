@@ -149,7 +149,7 @@
     appDefaults = {
       enable = lib.mkOption {
         type = lib.types.bool;
-        default = name == "default";
+        default = name == "default" && openclawLib.cfg.desktop.enable;
         description = "Configure macOS app defaults for this instance.";
       };
 
